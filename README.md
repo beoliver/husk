@@ -21,6 +21,11 @@ Imperative form of the the verb _huske_ - to remember or recollect
     3. [clean](#clean_tags)
 
 4.  [Bookmarks](#bookmarks)
+
+    1. [add](#add_bookmark)
+    1. [list](#find_bookmark)
+
+5.  [Notes](#notes)
     1. [add](#add_bookmark)
     1. [list](#find_bookmark)
 
@@ -150,13 +155,29 @@ bar-ideas   bar      /Users/yourname/Documents/bar/ideas
 ## `tag add` <a name="add_tag"></a>
 
 ```
-husk tag add NAME [-G] [--in CONTEXT]
+husk tag add TAGS [-G] [--in CONTEXT]
 ```
+
+Where `TAGS` is a comma separated list of tags
 
 | Flag   | Action                                                                        |
 | ------ | ----------------------------------------------------------------------------- |
 | `-G`   | Create a **G**lobal tag. Equivalent to `husk tag add TAG --in <root-context>` |
 | `--in` | Create the tag in a specified context                                         |
+
+### Examples
+
+Add a single tag `foo` to the current context.
+
+```
+$ husk tag add foo
+```
+
+Add the tags `foo`, `bar` and `baz` to the global context.
+
+```
+$ husk tag add -G foo,bar,baz
+```
 
 ## `tag list` <a name="show_tags"></a>
 
@@ -208,7 +229,7 @@ Bookmarks are references to "external" documents.
 ## `bm add` <a name="add_bookmark"></a>
 
 ```
-husk bm add PATH [-G] [--in CONTEXT] [--tags TAGS] [--note TEXT]
+husk bm add PATH [-G] [--in CONTEXT] [--tags TAGS] [--meta TEXT]
 ```
 
 Where `PATH` is either a `URL` or a local file on disk.
@@ -218,7 +239,7 @@ Where `PATH` is either a `URL` or a local file on disk.
 | `-G`     | Create a **G**lobal bookmark for the URL. Equivalent to `husk bm add PATH --in <root-context>` |
 | `--in`   | Create the URL bookmark in a specified context                                                 |
 | `--tag`  | Comma separated list of tags                                                                   |
-| `--note` | An Optional description                                                                        |
+| `--meta` | An Optional description                                                                        |
 
 When creating a bookmark, any tags supplied will be created within the desired context. This means that you can use the same value for a `tag` in multiple contexts.
 
@@ -236,3 +257,15 @@ husk bm list [-A] [-p] [-c] [--in CONTEXT] [--tags TAGS] [--pattern REGEX]
 | `--in`      | Create the URL bookmark in a specified context                                  |
 | `--tag`     | Comma separated list of tags fo filter by                                       |
 | `--pattern` | A regex pattern to marth against the link                                       |
+
+# Notes <a name="notes"></a>
+
+Notes are blocks of text that you want to store
+
+## `note add` <a name="add_note"></a>
+
+```
+husk note add [-G] [--in CONTEXT] [--tags TAGS]
+```
+
+Opens your default editor for the note
