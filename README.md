@@ -42,7 +42,9 @@ husk init <path> [--with-context NAME]
 | ---------------- | -------------------------------------- |
 | `--with-context` | Provide a custom **root context** name |
 
-Create a new `husk.db` and a `.husk` file in your home folder `~/`. If a custom `context` name is not passed then the default `<username>` is used.
+Create a new `~/.husk.db` and a `.husk` file in your home folder `~/`. If a custom `context` name is not passed then the default `<username>` is used.
+
+Note that both `HUSK` is a reserved context name. You can use it as an argument to `--name` to specify the top level user filesystem context that is created when running then `init` command.
 
 # Contexts <a name="context"></a>
 
@@ -51,9 +53,14 @@ A context (abbreviated to `ctx`) serves as a namespace that is used as an identi
 
 For example if you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`.
 
-If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **pysical context** of `work`. Likewise, if you are in `~/Documents`, then you are **NOT** in the pysical context of `work` nor `play`.
+If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **filesystem context** of `work`. Likewise, if you are in `~/Documents`, then you are **NOT** in the filesystem context of `work` nor `play`.
 
 Yet, it is entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. Your **mental context** is `play` while your "physical" context is `work`.
+
+This model has two outcomes.
+
+1. A **filesystem context** can have at most one "parent" filesystem contexts.
+2. A **filesystem context** can have one or more "child" filesystem contexts.
 
 ## `ctx init` <a name="context_init"></a>
 
@@ -95,13 +102,14 @@ In this case the following operation would be performed.
 The `ctx info` command is provides information about the current context.
 
 ```sh
-husk ctx info [-v] [--name CONTEXT]
+husk ctx info [-v] [-t] [--name CONTEXT]
 ```
 
-| Flag     | Action               |
-| -------- | -------------------- |
-| `-v`     | Verbose              |
-| `--name` | Name of the context. |
+| Flag     | Action                                    |
+| -------- | ----------------------------------------- |
+| `-v`     | Verbose                                   |
+| `-t`     | Shorthand for `husk ctx info --name HUSK` |
+| `--name` | Name of the context.                      |
 
 If no `--name` is provided then `husk` will attempt to calculate your current **context**.
 
@@ -139,7 +147,7 @@ Provides an overview of the different contexts that you have created.
 husk ctx list [-p] [-c] [-A] [--name CONTEXT]
 ```
 
-When called with no arguments the current working context is used as the default argument to `--name`.
+When called with no arguments the current working context or the current [set virtual context](#context_set) is used as the default argument to `--name`.
 
 | Flag     | Action                                                                      |
 | -------- | --------------------------------------------------------------------------- |
