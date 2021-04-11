@@ -51,16 +51,24 @@ Note that both `HUSK` is a reserved context name. You can use it as an argument 
 Contexts are a fundamental abstraction used by `husk`.
 A context (abbreviated to `ctx`) serves as a namespace that is used as an identifier whenever you `husk add` (remember!) something.
 
-For example if you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`.
+If you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`.
 
-If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **filesystem context** of `work`. Likewise, if you are in `~/Documents`, then you are **NOT** in the filesystem context of `work` nor `play`.
+If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **filesystem context** of `work`.
 
-Yet, it is entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. Your **mental context** is `play` while your "physical" context is `work`.
+However, if you are in `~/Documents`, then depending on how you look at it - either you are in the context of **both** `work` and `play` or you are in **neither**.
 
-This model has two outcomes.
+It is also entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. Your **mental context** is `play` while your "physical" (filesystem) context is `work`.
+
+If we think about filesystem contexts then the model has two outcomes (ignoring symlinks).
 
 1. A **filesystem context** can have at most one "parent" filesystem contexts.
 2. A **filesystem context** can have one or more "child" filesystem contexts.
+
+`husk` lets you create a **context** in any directory. A context is a namespace that lets you take notes, store bookmarks, add tags etc. From any context you can find the context (and related notes, bookmarks, tags etc that belong to it) for the parent (recursive) and its children.
+
+## Virtual Contexts
+
+Virtual contexts are not tied to the filesystem. This means that a virtual context can have multiple parents.
 
 ## `ctx init` <a name="context_init"></a>
 
