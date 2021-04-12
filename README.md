@@ -38,7 +38,7 @@ Initialize a new `husk` database and configuration
 | Flag     | Action                                                                                                              |
 | -------- | ------------------------------------------------------------------------------------------------------------------- |
 | `-f`     | Use **f**orce. This will overwrite any existing databases and configurations. Does not display confirmation prompt. |
-| `--path` | Defaults to `$HOME/.husk`                                                                                           |
+| `--path` | Location for `.husk` directory. Defaults to `$HOME`                                                                 |
 
 Creates a new `husk` directory in `$HOME/.config`
 
