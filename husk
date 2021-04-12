@@ -14,6 +14,7 @@ CONFIG_FILE = "config.json"
 HUSK_DB = "husk.db"
 DB_ENV_VAR = "HUSK_DB"
 HUSK_CONTEXT_FILENAME = ".husk_context"
+DEFAULT_HUSK_CONTEXT = "HUSK"
 
 # sqlite3 initialization ---------------------------------------------------------
 
@@ -43,6 +44,10 @@ def initialize_husk_db(db_path, force=False):
            context_name TEXT NOT NULL UNIQUE, 
            context_path TEXT NOT NULL UNIQUE, 
            created_at DATETIME DEFAULT CURRENT_TIMESTAMP);"""
+    )
+    cur.execute(
+        "INSERT INTO contexts (context_name, context_path) VALUES (?,?)",
+        (DEFAULT_HUSK_CONTEXT, ""),
     )
     cur.execute(
         """CREATE TABLE tags 
