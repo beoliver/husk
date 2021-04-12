@@ -1,14 +1,9 @@
 # husk
 
-#### English
+`husk` is a command line application for taking notes that lets you controll the **context** in which you they are saved.
 
-The outer covering of a grain or a seed.
-
-- Synonyms: rind, shell, hull, covering
-
-#### Norwegian
-
-Imperative form of the the verb _huske_ - to remember or recollect
+If you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`. If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **file system context** of `work`. However, if you are in `~/Documents`, then depending on how you look at it - either you are in the context of **both** `work` and `play` or you are in **neither**.
+It is also entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. In this case your **mental context** is `play` while your "physical" (filesystem) context is `work`.
 
 1.  [Initializing](#init)
 2.  [Contexts](#context)
@@ -52,11 +47,6 @@ Contexts are a fundamental abstraction used by `husk`.
 
 A context (abbreviated to `ctx`) is a namespace that lets you take notes, store bookmarks, add tags etc using `husk <op> add`. From any context you can find the context (and related notes, bookmarks, tags etc that belong to it) for the parent (recursive) and its children.
 Contexts are a lot like implicit `tags` - in the sense that whatever you save **MUST HAVE** an associated context.
-
-## Motivation
-
-If you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`. If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **file system context** of `work`. However, if you are in `~/Documents`, then depending on how you look at it - either you are in the context of **both** `work` and `play` or you are in **neither**.
-It is also entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. In this case your **mental context** is `play` while your "physical" (filesystem) context is `work`.
 
 ## File system and Virtual Contexts
 
@@ -185,6 +175,8 @@ When called with no arguments the current working context or the current [set vi
 
 ## `tag add` <a name="add_tag"></a>
 
+Explicity create a new tag. The `tag add` command is normally not required as you can create tags automatically when you save a note or bookmark.
+
 ```
 husk tag add TAGS [-G] [--name CONTEXT]
 ```
@@ -196,21 +188,9 @@ Where `TAGS` is a comma separated list of tags
 | `-G`     | Create a **G**lobal tag. Equivalent to `husk tag add TAG --name HUSK` |
 | `--name` | Create the tag in a specified context                                 |
 
-### Examples
-
-Add a single tag `foo` to the current context.
-
-```
-$ husk tag add foo
-```
-
-Add the tags `foo`, `bar` and `baz` to the global context.
-
-```
-$ husk tag add -G foo,bar,baz
-```
-
 ## `tag list` <a name="show_tags"></a>
+
+List all tags.
 
 ```
 husk tag list [-G] [-a] [-d] [--name CONTEXT] [--pattern REGEX]
@@ -224,11 +204,9 @@ husk tag list [-G] [-a] [-d] [--name CONTEXT] [--pattern REGEX]
 | `--name`    | Use a specified context                                     |
 | `--pattern` | A regex pattern to marth against the tag                    |
 
-Notice that the same tag may appear in different contexts.
-
 ## `tag clean` <a name="clean_tags"></a>
 
-Removes any tags that are not used
+Remove used tags.
 
 ```
 husk tag clean [-G] [-a] [-d] [--name CONTEXT] [--dry-run]
