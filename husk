@@ -6,9 +6,27 @@ import os
 import re
 import sqlite3
 import sys
+from pathlib import Path
 
+HUSK_DIR = ".husk"
+CONFIG_FILE = "config.json"
+HUSK_DB = "husk.db"
 DB_ENV_VAR = "HUSK_DB"
 HUSK_CONTEXT_FILENAME = ".husk_context"
+
+# sqlite3 initialization ---------------------------------------------------------
+
+# In order to use the husk program, a user must have an instance of a sqlite database
+
+
+def initialize_husk_db(db_dir, force=False):
+    # 1. If `db_dir` does not exist then error
+    # 2. Check if an existing `HUSK_DIR` dir exists
+    #    2.1. If dir exists and `force=False` then Error
+    # 3. Create an empty directory `db_dir/HUSK_DIR`
+    # 4. Create an empty database at `db_dir/HUSK_DIR/HUSK_DB`
+    # 5. Create tables
+    pass
 
 
 def infer_context_from_invocation_path(path):
@@ -47,71 +65,87 @@ FIND_COMMAND = "find"
 LIST_COMMAND = "list"
 TAGS_COMMAND = "tags"
 
-arg_parser = argparse.ArgumentParser(prog="hu", description="HUsk")
-
-arg_parser.add_argument(
-    "--db",
-    metavar="PATH",
-    type=str,
-    default=os.environ.get(DB_ENV_VAR, None),
-    help="Path to sqlite database",
+arg_parser = argparse.ArgumentParser(
+    prog="hu",
+    description="husk is a command line application for taking notes in context.",
 )
 
 subparsers = arg_parser.add_subparsers()
 
-init_parser = subparsers.add_parser(INIT_COMMAND, help="Init something")
-save_parser = subparsers.add_parser(SAVE_COMMAND, help="Save something")
-find_parser = subparsers.add_parser(FIND_COMMAND, help="Find something")
-list_parser = subparsers.add_parser(LIST_COMMAND, help="List something")
-tags_parser = subparsers.add_parser(TAGS_COMMAND, help="Manage tags")
+init_parser = subparsers.add_parser(
+    INIT_COMMAND,
+    help="Initialize a new database",
+    description="Initialize a new database",
+)
 
 init_parser.set_defaults(command=INIT_COMMAND)
-save_parser.set_defaults(command=SAVE_COMMAND)
-find_parser.set_defaults(command=FIND_COMMAND)
-list_parser.set_defaults(command=LIST_COMMAND)
-tags_parser.set_defaults(command=TAGS_COMMAND)
+
+init_parser.add_argument(
+    "-f",
+    "--force",
+    action="store_true",
+    help="Use force. This will overwrite any existing databases and configurations",
+)
 
 init_parser.add_argument(
     "--path",
     metavar="PATH",
-    default=os.getcwd(),
+    default=os.path.join(str(Path.home()), HUSK_DIR),
     type=str,
-    help="Top level directory for the context",
+    help="Dir to create the {} dir containing the database. Defaults to $HOME".format(
+        HUSK_DIR
+    ),
 )
 
-init_parser.add_argument(
-    "--context",
-    metavar="NAME",
-    default=os.path.basename(os.getcwd()),
-    type=str,
-    help="Name of context to initialize",
-)
 
-init_parser.add_argument(
-    "-f", "--force", action="store_true", help="Do not promt for confirmation",
-)
+# arg_parser.add_argument(
+#     "--db",
+#     metavar="PATH",
+#     type=str,
+#     default=os.environ.get(DB_ENV_VAR, None),
+#     help="Path to sqlite database",
+# )
 
-tags_parser.add_argument(
-    "--context",
-    default=infer_context_from_invocation_path(os.getcwd()),
-    help="select an alternative context namespace for the tags",
-)
+# save_parser = subparsers.add_parser(SAVE_COMMAND, help="Save something")
+# find_parser = subparsers.add_parser(FIND_COMMAND, help="Find something")
+# list_parser = subparsers.add_parser(LIST_COMMAND, help="List something")
+# tags_parser = subparsers.add_parser(TAGS_COMMAND, help="Manage tags")
 
-save_parser.add_argument(
-    "input", type=str, help="Thing to 'husk'",
-)
+# save_parser.set_defaults(command=SAVE_COMMAND)
+# find_parser.set_defaults(command=FIND_COMMAND)
+# list_parser.set_defaults(command=LIST_COMMAND)
+# tags_parser.set_defaults(command=TAGS_COMMAND)
 
-save_parser.add_argument(
-    "--tags", type=str, help="Comma separated list of tags",
-)
+# init_parser.add_argument(
+#     "--context",
+#     metavar="NAME",
+#     default=os.path.basename(os.getcwd()),
+#     type=str,
+#     help="Name of context to initialize",
+# )
 
-list_parser.add_argument(
-    "type", type=str, choices=["tags", "bookmarks"], help="The type of thing to list",
-)
 
-list_parser.add_argument(
-    "--pattern", type=str, help="Regex pattern",
-)
+# tags_parser.add_argument(
+#     "--context",
+#     default=infer_context_from_invocation_path(os.getcwd()),
+#     help="select an alternative context namespace for the tags",
+# )
+
+# save_parser.add_argument(
+#     "input", type=str, help="Thing to 'husk'",
+# )
+
+# save_parser.add_argument(
+#     "--tags", type=str, help="Comma separated list of tags",
+# )
+
+# list_parser.add_argument(
+#     "type", type=str, choices=["tags", "bookmarks"], help="The type of thing to list",
+# )
+
+# list_parser.add_argument(
+#     "--pattern", type=str, help="Regex pattern",
+# )
 
 # helpers  -------------------------------------------------------------------------
 
@@ -145,19 +179,24 @@ def add_context(db, context_name, context_path):
     db.commit()
 
 
+# init handler ---------------------------------------------------------------------
+
+
 def init_handler(db, args):
     force = args.force
-    path = args.path
-    context = args.context
+    db_location = os.path.join(args.path, HUSK_DB)
+    config_dir = "husk"
+    config_path = os.path.join(str(Path.home()), ".config", config_dir, CONFIG_FILE)
 
-    message = "This will perform the following action:\nInitialize context '{}' in directory '{}'".format(
-        context, path
+    message = "This will perform the following actions:\n1. Create '{}'.\n2. Create '{}'.".format(
+        db_location, config_path,
     )
 
     if user_confirmation(message, force):
-        add_context(db, context, path)
-        with open(os.path.join(path, ".husk_context"), "w+") as f:
-            f.write(json.dumps({"context_name": context, "context_path": path}))
+        pass
+        # add_context(db, context, path)
+        # with open(os.path.join(path, ".husk_context"), "w+") as f:
+        #     f.write(json.dumps({"context_name": context, "context_path": path}))
 
 
 # tags handler ---------------------------------------------------------------------
@@ -232,7 +271,8 @@ def ensure_command(command):
 
 
 def main(args):
-    db = ensure_db(args.db)
+    # db = ensure_db(args.db)
+    db = None
     command = ensure_command(vars(args).get("command", None))
     command_handlers[command](db, args)
 

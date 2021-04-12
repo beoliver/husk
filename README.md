@@ -30,16 +30,23 @@ It is also entirely reasonable for you to be thinking about `play` while in the 
 # Initializing <a name="init"></a>
 
 ```sh
-husk init <path> [--with-context NAME]
+husk init [-f] [--path PATH]
 ```
 
-| Flag             | Action                                 |
-| ---------------- | -------------------------------------- |
-| `--with-context` | Provide a custom **root context** name |
+Initialize a new `husk` database and configuration
 
-Create a new `~/.husk.db` and a `.husk` file in your home folder `~/`. If a custom `context` name is not passed then the default `<username>` is used.
+| Flag     | Action                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `-f`     | Use **f**orce. This will overwrite any existing databases and configurations. Does not display confirmation prompt. |
+| `--path` | Defaults to `$HOME/.husk`                                                                                           |
 
-Note that both `HUSK` is a reserved context name. You can use it as an argument to `--name` to specify the top level user filesystem context that is created when running then `init` command.
+Creates a new `husk` directory in `$HOME/.config`
+
+Create a new `~/.husk` directory in `--path` directory.
+
+Creates a `HUSK` context. You can use it as an argument to `--name` to specify the top level user filesystem context that is created when running then `init` command.
+
+Every context that you create is a **descendant** of the `HUSK` context.
 
 # Contexts <a name="context"></a>
 
