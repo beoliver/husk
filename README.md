@@ -85,11 +85,11 @@ The `ctx init` command is used to initiate a new context.
 husk ctx init [--virtual] [--name NAME] [--path PATH]
 ```
 
-| Flag        | Action                                                        |
-| ----------- | ------------------------------------------------------------- |
-| `--virtual` | Create a virtual context that is not tied to your filesystem. |
-| `--name`    | Name of the context.                                          |
-| `--path`    | Path to context root directory                                |
+| Flag        | Action                                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--virtual` | Create a virtual context that is not tied to your filesystem.                                                                               |
+| `--name`    | Name of the context. By default the _name_ of the current working diretory                                                                  |
+| `--path`    | Path to context root directory. By default the path to the current working directory. This flag is ignored when creating a virtual context. |
 
 By default a **context** is mapped to your current working directory. For example if we were in `~/Documents/work` and run the following:
 
