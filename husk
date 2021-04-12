@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import re
+import sqlite3
+import sys
+
+DB_ENV_VAR = "HUSK_DB"
+HUSK_CONTEXT_FILENAME = ".husk_context"
+
+
+def infer_context_from_invocation_path(path):
+    """
+    walk up the path looking for a file with the 
+    name $HUSK_CONTEXT_FILENAME.    
+    """
+    while True:
+        (next_path, _) = os.path.split(path)
+        with os.scandir(path) as dir:
+            file = next(
+                filter(
+                    lambda entry: entry.is_file()
+                    and entry.name == HUSK_CONTEXT_FILENAME,
+                    dir,
+                ),
+                None,
+            )
+        if file:
+            with open(file.path, "r") as f:
+                data = f.read()
+            context_info = json.loads(data)
+            return context_info
+        else:
+            if path == next_path:
+                return None
+            else:
+                path = next_path
+
+
+# argparse -------------------------------------------------------------------------
+
+INIT_COMMAND = "init"
+SAVE_COMMAND = "save"
+FIND_COMMAND = "find"
+LIST_COMMAND = "list"
+TAGS_COMMAND = "tags"
+
+arg_parser = argparse.ArgumentParser(prog="hu", description="HUsk")
+
+arg_parser.add_argument(
+    "--db",
+    metavar="PATH",
+    type=str,
+    default=os.environ.get(DB_ENV_VAR, None),
+    help="Path to sqlite database",
+)
+
+subparsers = arg_parser.add_subparsers()
+
+init_parser = subparsers.add_parser(INIT_COMMAND, help="Init something")
+save_parser = subparsers.add_parser(SAVE_COMMAND, help="Save something")
+find_parser = subparsers.add_parser(FIND_COMMAND, help="Find something")
+list_parser = subparsers.add_parser(LIST_COMMAND, help="List something")
+tags_parser = subparsers.add_parser(TAGS_COMMAND, help="Manage tags")
+
+init_parser.set_defaults(command=INIT_COMMAND)
+save_parser.set_defaults(command=SAVE_COMMAND)
+find_parser.set_defaults(command=FIND_COMMAND)
+list_parser.set_defaults(command=LIST_COMMAND)
+tags_parser.set_defaults(command=TAGS_COMMAND)
+
+init_parser.add_argument(
+    "--path",
+    metavar="PATH",
+    default=os.getcwd(),
+    type=str,
+    help="Top level directory for the context",
+)
+
+init_parser.add_argument(
+    "--context",
+    metavar="NAME",
+    default=os.path.basename(os.getcwd()),
+    type=str,
+    help="Name of context to initialize",
+)
+
+init_parser.add_argument(
+    "-f", "--force", action="store_true", help="Do not promt for confirmation",
+)
+
+tags_parser.add_argument(
+    "--context",
+    default=infer_context_from_invocation_path(os.getcwd()),
+    help="select an alternative context namespace for the tags",
+)
+
+save_parser.add_argument(
+    "input", type=str, help="Thing to 'husk'",
+)
+
+save_parser.add_argument(
+    "--tags", type=str, help="Comma separated list of tags",
+)
+
+list_parser.add_argument(
+    "type", type=str, choices=["tags", "bookmarks"], help="The type of thing to list",
+)
+
+list_parser.add_argument(
+    "--pattern", type=str, help="Regex pattern",
+)
+
+# helpers  -------------------------------------------------------------------------
+
+
+def should_continue(input):
+    return input.lower() == "y"
+
+
+def user_confirmation(message, implicit_yes=False):
+    if implicit_yes:
+        return implicit_yes
+    selection = input("{}\nProceed? [y/N]: ".format(message))
+    return should_continue(selection)
+
+
+# handlers -------------------------------------------------------------------------
+
+
+def save_handler(db, args):
+    item = args.input
+    tags = args.tags
+    print("save!", item, "as", tags)
+
+
+def find_handler(db, args):
+    print("find!")
+
+
+def add_context(db, context_name, context_path):
+    db.execute("INSERT INTO contexts VALUES (?,?)", (context_name, context_path))
+    db.commit()
+
+
+def init_handler(db, args):
+    force = args.force
+    path = args.path
+    context = args.context
+
+    message = "This will perform the following action:\nInitialize context '{}' in directory '{}'".format(
+        context, path
+    )
+
+    if user_confirmation(message, force):
+        add_context(db, context, path)
+        with open(os.path.join(path, ".husk_context"), "w+") as f:
+            f.write(json.dumps({"context_name": context, "context_path": path}))
+
+
+# tags handler ---------------------------------------------------------------------
+
+
+def tags_handler(db, args):
+    print("context: {}".format(args.context))
+    print("TAGS!")
+
+
+# list handler ---------------------------------------------------------------------
+
+
+def list_tags(db, regex_pattern=None):
+    tags = (tag for (tag,) in db.execute("SELECT tag FROM tags"))
+    if regex_pattern is None:
+        return tags
+    pattern = re.compile(regex_pattern)
+    return filter(lambda tag: pattern.match(tag), tags)
+
+
+def list_bookmarks(db, regex_pattern=None):
+    urls = (url for (url,) in db.execute("SELECT url FROM bookmarks"))
+    if regex_pattern is None:
+        return urls
+    pattern = re.compile(regex_pattern)
+    return filter(lambda url: pattern.match(url), urls)
+
+
+def list_handler(db, args):
+    items_to_list = args.type
+    optional_regex = args.pattern
+    list_handlers = {"tags": list_tags, "bookmarks": list_bookmarks}
+    items = list_handlers[items_to_list](db, optional_regex)
+    for item in items:
+        print(item)
+
+
+# handlers -------------------------------------------------------------------------
+# dispatch -------------------------------------------------------------------------
+
+command_handlers = {
+    INIT_COMMAND: init_handler,
+    SAVE_COMMAND: save_handler,
+    FIND_COMMAND: find_handler,
+    LIST_COMMAND: list_handler,
+    TAGS_COMMAND: tags_handler,
+}
+
+# helpers --------------------------------------------------------------------------
+
+
+def ensure_db(db_path):
+    # print(db_path)
+    if db_path is None:
+        raise Exception(
+            "No DATABASE selected. Use the shell variable {} or use the --db flag".format(
+                DB_ENV_VAR
+            )
+        )
+    db = sqlite3.connect(db_path)
+    return db
+
+
+def ensure_command(command):
+    if command is None:
+        raise Exception("No COMMAND selected...")
+    return command
+
+
+# main ------------------------------------------------------------------------------
+
+
+def main(args):
+    db = ensure_db(args.db)
+    command = ensure_command(vars(args).get("command", None))
+    command_handlers[command](db, args)
+
+
+if __name__ == "__main__":
+    args = arg_parser.parse_args()
+    try:
+        main(args)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
