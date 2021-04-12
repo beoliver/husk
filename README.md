@@ -49,26 +49,43 @@ Note that both `HUSK` is a reserved context name. You can use it as an argument 
 # Contexts <a name="context"></a>
 
 Contexts are a fundamental abstraction used by `husk`.
-A context (abbreviated to `ctx`) serves as a namespace that is used as an identifier whenever you `husk add` (remember!) something.
 
-If you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`.
+A context (abbreviated to `ctx`) is a namespace that lets you take notes, store bookmarks, add tags etc using `husk <op> add`. From any context you can find the context (and related notes, bookmarks, tags etc that belong to it) for the parent (recursive) and its children.
+Contexts are a lot like implicit `tags` - in the sense that whatever you save **MUST HAVE** an associated context.
 
-If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **filesystem context** of `work`.
+## Motivation
 
-However, if you are in `~/Documents`, then depending on how you look at it - either you are in the context of **both** `work` and `play` or you are in **neither**.
+If you use your machine for both work and play you might find that you have two directories `~/Documents/work` and `~/Documents/play`. If you are in the subdirectory `~/Documents/work/foo/src`, then you are in the **file system context** of `work`. However, if you are in `~/Documents`, then depending on how you look at it - either you are in the context of **both** `work` and `play` or you are in **neither**.
+It is also entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. In this case your **mental context** is `play` while your "physical" (filesystem) context is `work`.
 
-It is also entirely reasonable for you to be thinking about `play` while in the `~/Documents/work` directory. Your **mental context** is `play` while your "physical" (filesystem) context is `work`.
+## File system and Virtual Contexts
 
-If we think about filesystem contexts then the model has two outcomes (ignoring symlinks).
+### File system Contexts
 
-1. A **filesystem context** can have at most one "parent" filesystem contexts.
-2. A **filesystem context** can have one or more "child" filesystem contexts.
+`husk` lets you create a **file system context** in any directory.
 
-`husk` lets you create a **context** in any directory. A context is a namespace that lets you take notes, store bookmarks, add tags etc. From any context you can find the context (and related notes, bookmarks, tags etc that belong to it) for the parent (recursive) and its children.
+The file system contexts have the following properties (TODO: decide on handling of symlinks).
 
-## Virtual Contexts
+1. A **file system context** can have 0 or 1 "parent" **file system contexts**.
+2. A **file system context** can have 0 or many "ancestor" **file system contexts**.
+3. A **file system context** can have 0 or many "child" **file system contexts**.
+4. A **file system context** can have 0 or many "decendant" **file system contexts**.
 
-Virtual contexts are not tied to the filesystem. This means that a virtual context can have multiple parents.
+Given a file path `.../a/.../b/.../c/...`
+
+Assume a context `c_a` was initialized in directory `a` and a context `c_b` was initialized in directory `b` and `c_c` was initialized in directory `c`.
+
+1. The contents of contexts `c_a` and `c_b` are "accessable" to context `c_c` when using the `--ancestors` (`-a`) flag.
+2. The contents of contexts `c_b` and `c_c` are "accessable" to context `c_a` when using the `--descendants` (`-d`) flag.
+
+### Virtual Contexts
+
+Virtual contexts are not tied to the file system. This means that a virtual context can have multiple parents.
+When creating a virtual context - it has `HUSK` as the parent
+
+```
+V1 -> HUSK
+```
 
 ## `ctx init` <a name="context_init"></a>
 
@@ -152,66 +169,17 @@ Unsets the virual context for the entire filesystem if active.
 Provides an overview of the different contexts that you have created.
 
 ```
-husk ctx list [-p] [-c] [-A] [--name CONTEXT]
+husk ctx list [-G] [-a] [-d] [--name CONTEXT]
 ```
 
 When called with no arguments the current working context or the current [set virtual context](#context_set) is used as the default argument to `--name`.
 
-| Flag     | Action                                                                      |
-| -------- | --------------------------------------------------------------------------- |
-| `-A`     | List **A**LL contexts. Equivalent to `husk ctx list -c --in <root-context>` |
-| `-p`     | Include all **p**arent contexts                                             |
-| `-c`     | Include all **c**hild contexts                                              |
-| `--name` | Use a specified context                                                     |
-
-### Examples <a name="init_context_examples"></a>
-
-The following examples assume that your current working directory is `/Users/yourname/Documents/foo`.
-
-```
-$ husk ctx list
-Context     Parent   Path
-*foo        yourname /Users/yourname/Documents/foo
-```
-
-```
-$ husk ctx list -p
-Context     Parent   Path
-yourname    -        /Users/yourname/
-*foo        yourname /Users/yourname/Documents/foo
-```
-
-```
-$ husk ctx list -c
-Context     Parent   Path
-*foo        yourname /Users/yourname/Documents/foo
-foo-tasks   foo      /Users/yourname/Documents/foo/tasks
-```
-
-```
-$ husk ctx list -pc
-Context     Parent   Path
-yourname    -        /Users/yourname/
-*foo        yourname /Users/yourname/Documents/foo
-foo-tasks   foo      /Users/yourname/Documents/foo/tasks
-```
-
-```
-$ husk ctx list -A
-Context     Parent   Path
-yourname    -        /Users/yourname/
-*foo        yourname /Users/yourname/Documents/foo
-foo-tasks   foo      /Users/yourname/Documents/foo/tasks
-bar         yourname /Users/yourname/Documents/bar
-bar-ideas   bar      /Users/yourname/Documents/bar/ideas
-```
-
-```
-$ husk ctx list -c --name bar
-Context     Parent   Path
-bar         yourname /Users/yourname/Documents/bar
-bar-ideas   bar      /Users/yourname/Documents/bar/ideas
-```
+| Flag     | Action                                                        |
+| -------- | ------------------------------------------------------------- |
+| `-G`     | List all contexts. Equivalent to `husk ctx list -d --in HUSK` |
+| `-a`     | Include all **a**nscestor contexts                            |
+| `-d`     | Include all **d**escendant contexts                           |
+| `--name` | Use a specified context                                       |
 
 # Tags
 
@@ -223,10 +191,10 @@ husk tag add TAGS [-G] [--name CONTEXT]
 
 Where `TAGS` is a comma separated list of tags
 
-| Flag     | Action                                                                          |
-| -------- | ------------------------------------------------------------------------------- |
-| `-G`     | Create a **G**lobal tag. Equivalent to `husk tag add TAG --name <root-context>` |
-| `--name` | Create the tag in a specified context                                           |
+| Flag     | Action                                                                |
+| -------- | --------------------------------------------------------------------- |
+| `-G`     | Create a **G**lobal tag. Equivalent to `husk tag add TAG --name HUSK` |
+| `--name` | Create the tag in a specified context                                 |
 
 ### Examples
 
@@ -245,27 +213,16 @@ $ husk tag add -G foo,bar,baz
 ## `tag list` <a name="show_tags"></a>
 
 ```
-husk tag list [-p] [-c] [-A] [--name CONTEXT] [--pattern REGEX]
+husk tag list [-G] [-a] [-d] [--name CONTEXT] [--pattern REGEX]
 ```
 
-| Flag        | Action                                                                    |
-| ----------- | ------------------------------------------------------------------------- |
-| `-A`        | List **A**LL tags. Equivalent to `husk tag list -c --name <root-context>` |
-| `-p`        | Include all tags defined within **p**arent contexts                       |
-| `-c`        | Include all tags defined within **c**hild contexts                        |
-| `--name`    | Use a specified context                                                   |
-| `--pattern` | A regex pattern to marth against the tag                                  |
-
-### Examples <a name="tag_show"></a>
-
-```
-$ husk tag list -A
-Tag     Context
-tag1    foo
-tag1    yourname
-tag2    yourname
-tag3    bar-ideas
-```
+| Flag        | Action                                                      |
+| ----------- | ----------------------------------------------------------- |
+| `-G`        | List all tags. Equivalent to `husk tag list -d --name HUSK` |
+| `-a`        | Include all tags defined within **a**nscestor contexts      |
+| `-d`        | Include all tags defined within **d**escendant contexts     |
+| `--name`    | Use a specified context                                     |
+| `--pattern` | A regex pattern to marth against the tag                    |
 
 Notice that the same tag may appear in different contexts.
 
@@ -274,16 +231,16 @@ Notice that the same tag may appear in different contexts.
 Removes any tags that are not used
 
 ```
-husk tag clean [-p] [-c] [-A] [--name CONTEXT] [--dry-run]
+husk tag clean [-G] [-a] [-d] [--name CONTEXT] [--dry-run]
 ```
 
-| Flag        | Action                                                                      |
-| ----------- | --------------------------------------------------------------------------- |
-| `-A`        | Clean **A**LL tags. Equivalent to `husk tag clean -c --name <root-context>` |
-| `-p`        | Include all tags defined within **p**arent contexts                         |
-| `-c`        | Include all tags defined within **c**hild contexts                          |
-| `--name`    | Use a specified context                                                     |
-| `--dry-run` | Show which tags would be deleted                                            |
+| Flag        | Action                                                                  |
+| ----------- | ----------------------------------------------------------------------- |
+| `-G`        | Clean all tags. Equivalent to `husk tag clean -c --name <root-context>` |
+| `-a`        | Include all tags defined within **a**nscestor contexts                  |
+| `-d`        | Include all tags defined within **d**escendant contexts                 |
+| `--name`    | Use a specified context                                                 |
+| `--dry-run` | Show which tags would be deleted                                        |
 
 # Bookmarks <a name="bookmarks"></a>
 
@@ -297,29 +254,29 @@ husk bm add PATH [-G] [--name CONTEXT] [--tags TAGS] [--meta TEXT]
 
 Where `PATH` is either a `URL` or a local file on disk.
 
-| Flag     | Action                                                                                           |
-| -------- | ------------------------------------------------------------------------------------------------ |
-| `-G`     | Create a **G**lobal bookmark for the URL. Equivalent to `husk bm add PATH --name <root-context>` |
-| `--name` | Create the URL bookmark in a specified context                                                   |
-| `--tag`  | Comma separated list of tags                                                                     |
-| `--meta` | An Optional description                                                                          |
+| Flag     | Action                                                                                 |
+| -------- | -------------------------------------------------------------------------------------- |
+| `-G`     | Create a **G**lobal bookmark for the URL. Equivalent to `husk bm add PATH --name HUSK` |
+| `--name` | Create the URL bookmark in a specified context                                         |
+| `--tag`  | Comma separated list of tags                                                           |
+| `--meta` | An Optional description                                                                |
 
 When creating a bookmark, any tags supplied will be created within the desired context. This means that you can use the same value for a `tag` in multiple contexts.
 
 ## `bm list` <a name="show_bookmark"></a>
 
 ```
-husk bm list [-A] [-p] [-c] [--name CONTEXT] [--tags TAGS] [--pattern REGEX]
+husk bm list [-G] [-a] [-d] [--name CONTEXT] [--tags TAGS] [--pattern REGEX]
 ```
 
-| Flag        | Action                                                                            |
-| ----------- | --------------------------------------------------------------------------------- |
-| `-A`        | List all **A**ll bookmarks. Equivalent to `husk bm list -c --name <root-context>` |
-| `-p`        | Include all bookmarks defined within **p**arent contexts                          |
-| `-c`        | Include all bookmarks defined within **c**hild contexts                           |
-| `--name`    | Create the URL bookmark in a specified context                                    |
-| `--tag`     | Comma separated list of tags fo filter by                                         |
-| `--pattern` | A regex pattern to marth against the link                                         |
+| Flag        | Action                                                              |
+| ----------- | ------------------------------------------------------------------- |
+| `-G`        | List all all bookmarks. Equivalent to `husk bm list -d --name HUSK` |
+| `-a`        | Include all bookmarks defined within **a**nscestor contexts         |
+| `-d`        | Include all bookmarks defined within **d**escendant contexts        |
+| `--name`    | Create the URL bookmark in a specified context                      |
+| `--tag`     | Comma separated list of tags fo filter by                           |
+| `--pattern` | A regex pattern to marth against the link                           |
 
 # Notes <a name="notes"></a>
 
