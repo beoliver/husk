@@ -119,6 +119,23 @@ In this case the following operation would be performed.
 
 1. The context name is added to the `husk.db`.
 
+## `ctx show` <a name="context_show"></a>
+
+Provides an overview of the different contexts that you have created.
+
+```
+husk ctx show [-G] [-a] [-d] [--name CONTEXT]
+```
+
+When called with no arguments the current working context or the current [set virtual context](#context_set) is used as the default argument to `--name`.
+
+| Flag     | Action                                                        |
+| -------- | ------------------------------------------------------------- |
+| `-G`     | List all contexts. Equivalent to `husk ctx show -d --in HUSK` |
+| `-a`     | Include all **a**nscestor contexts                            |
+| `-d`     | Include all **d**escendant contexts                           |
+| `--name` | Use a specified context                                       |
+
 ## `ctx info` <a name="context_info"></a>
 
 The `ctx info` command is provides information about the current context.
@@ -160,23 +177,6 @@ husk ctx unset
 ```
 
 Unsets the virual context for the entire filesystem if active.
-
-## `ctx list` <a name="context_show"></a>
-
-Provides an overview of the different contexts that you have created.
-
-```
-husk ctx list [-G] [-a] [-d] [--name CONTEXT]
-```
-
-When called with no arguments the current working context or the current [set virtual context](#context_set) is used as the default argument to `--name`.
-
-| Flag     | Action                                                        |
-| -------- | ------------------------------------------------------------- |
-| `-G`     | List all contexts. Equivalent to `husk ctx list -d --in HUSK` |
-| `-a`     | Include all **a**nscestor contexts                            |
-| `-d`     | Include all **d**escendant contexts                           |
-| `--name` | Use a specified context                                       |
 
 # Tags
 
