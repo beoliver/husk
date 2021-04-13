@@ -142,7 +142,7 @@ def infer_context_from_invocation_path(path):
 # argparse -------------------------------------------------------------------------
 
 INIT_COMMAND = "init"
-CONTEXT_COMMAND = "ctx"
+CONTEXT_COMMAND = "context"
 CONTEXT_INIT_COMMAND = "{} {}".format(CONTEXT_COMMAND, INIT_COMMAND)
 SHOW_COMMAND = "show"
 CONTEXT_SHOW_COMMAND = "{} {}".format(CONTEXT_COMMAND, SHOW_COMMAND)
