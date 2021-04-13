@@ -16,6 +16,42 @@ DB_ENV_VAR = "HUSK_DB"
 HUSK_CONTEXT_FILENAME = ".husk_context"
 DEFAULT_HUSK_CONTEXT = "HUSK"
 
+# context types -----------------------------------------------------------------
+
+VIRTUAL_CONTEXT_TYPE = "VIRTUAL"
+FILE_CONTEXT_TYPE = "FILE"
+
+# husk context -------------------------------------------------------------------
+
+# The path the database that we use is controlled by the user.
+# We have to read `$HOME/.config/husk/config.json` every time.
+# It would be nice if we could use a python `context`
+# which would let us write something like
+
+# with Husk() as husk:
+#     print(husk.config)
+#     cursor = husk.conn.cursor()
+#     cursor.execute("INERT INTO contexts VALUES ...")
+
+# and then `conn` is closed by `Husk()`
+
+
+class Husk(object):
+    def __init__(self):
+        config_path = os.path.join(
+            str(Path.home()), ".config", CONFIG_HUSK_DIR, CONFIG_FILE
+        )
+        with open(config_path) as config:
+            self.config = json.loads(config.read())
+
+    def __enter__(self):
+        self.conn = sqlite3.connect(self.config["db_path"])
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.conn.close()
+
+
 # sqlite3 initialization ---------------------------------------------------------
 
 # In order to use the husk program, a user must have an instance of a sqlite database
@@ -25,9 +61,9 @@ def initialize_husk_config(config_dir, db_path, force=False):
     config_path = Path(config_dir)
     if not config_path.exists():
         config_path.mkdir()
-    husk_config_path = os.path.join(config_dir, CONFIG_HUSK_DIR)
-    config_path.mkdir(exist_ok=force)
-    with open(os.path.join(husk_config_path, CONFIG_FILE), "w+") as f:
+    husk_config_path = Path(os.path.join(config_dir, CONFIG_HUSK_DIR))
+    husk_config_path.mkdir(exist_ok=force)
+    with open(os.path.join(str(husk_config_path), CONFIG_FILE), "w+") as f:
         f.write(json.dumps({"db_path": db_path}))
 
 
@@ -42,12 +78,13 @@ def initialize_husk_db(db_path, force=False):
         """CREATE TABLE contexts 
            (context_id INTEGER PRIMARY KEY AUTOINCREMENT, 
            context_name TEXT NOT NULL UNIQUE, 
-           context_path TEXT NOT NULL UNIQUE, 
+           context_type TEXT NOT NULL,           
+           context_path TEXT UNIQUE,
            created_at DATETIME DEFAULT CURRENT_TIMESTAMP);"""
     )
     cur.execute(
-        "INSERT INTO contexts (context_name, context_path) VALUES (?,?)",
-        (DEFAULT_HUSK_CONTEXT, ""),
+        "INSERT INTO contexts (context_name, context_path, context_type) VALUES (?,?,?)",
+        (DEFAULT_HUSK_CONTEXT, None, VIRTUAL_CONTEXT_TYPE),
     )
     cur.execute(
         """CREATE TABLE tags 
@@ -100,7 +137,9 @@ def infer_context_from_invocation_path(path):
 
 INIT_COMMAND = "init"
 CONTEXT_COMMAND = "ctx"
-CONTEXT_INIT_COMMAND = "{} init".format(CONTEXT_COMMAND)
+CONTEXT_INIT_COMMAND = "{} {}".format(CONTEXT_COMMAND, INIT_COMMAND)
+LIST_COMMAND = "list"
+CONTEXT_LIST_COMMAND = "{} {}".format(CONTEXT_COMMAND, LIST_COMMAND)
 
 # SAVE_COMMAND = "save"
 # FIND_COMMAND = "find"
@@ -139,7 +178,7 @@ init_parser.add_argument(
     ),
 )
 
-# CONTEXT parser
+# CONTEXT parser ------------------------------------------------------------------------
 
 context_parser = subparsers.add_parser(
     CONTEXT_COMMAND, help="Context stuff", description="Context stuff",
@@ -149,18 +188,13 @@ context_parser.set_defaults(command=CONTEXT_COMMAND)
 
 context_subparsers = context_parser.add_subparsers()
 
+# CONTEXT INIT parser --------------------------------------------------------------
+
 context_init_parser = context_subparsers.add_parser(
     INIT_COMMAND, help="Initiate a new context", description="Initiate a new context",
 )
 
 context_init_parser.set_defaults(command=CONTEXT_INIT_COMMAND)
-
-# context_init_parser.add_argument(
-#     "-f",
-#     "--force",
-#     action="store_true",
-#     help="Use force. This will overwrite any existing databases and configurations",
-# )
 
 context_init_parser.add_argument(
     "--virtual",
@@ -171,66 +205,45 @@ context_init_parser.add_argument(
 context_init_parser.add_argument(
     "--name",
     type=str,
+    default=os.path.basename(os.getcwd()),
     help="Name of the context. By default the name of the current working diretory",
 )
 
 context_init_parser.add_argument(
     "--path",
     metavar="PATH",
-    default=os.path.join(str(Path.home()), HUSK_DIR),
+    default=os.getcwd(),
     type=str,
     help="Path to context root directory. By default the path to the current working directory. This flag is ignored when creating a virtual context.",
 )
 
+# CONTEXT LIST parser --------------------------------------------------------------
 
-# arg_parser.add_argument(
-#     "--db",
-#     metavar="PATH",
-#     type=str,
-#     default=os.environ.get(DB_ENV_VAR, None),
-#     help="Path to sqlite database",
-# )
+context_list_parser = context_subparsers.add_parser(
+    LIST_COMMAND, help="List all contexts", description="List all contexts",
+)
 
-# save_parser = subparsers.add_parser(SAVE_COMMAND, help="Save something")
-# find_parser = subparsers.add_parser(FIND_COMMAND, help="Find something")
-# list_parser = subparsers.add_parser(LIST_COMMAND, help="List something")
-# tags_parser = subparsers.add_parser(TAGS_COMMAND, help="Manage tags")
+context_list_parser.add_argument(
+    "-G", action="store_true", help="All contexts",
+)
 
-# save_parser.set_defaults(command=SAVE_COMMAND)
-# find_parser.set_defaults(command=FIND_COMMAND)
-# list_parser.set_defaults(command=LIST_COMMAND)
-# tags_parser.set_defaults(command=TAGS_COMMAND)
+context_list_parser.add_argument(
+    "-a", action="store_true", help="Include anscestors",
+)
 
-# init_parser.add_argument(
-#     "--context",
-#     metavar="NAME",
-#     default=os.path.basename(os.getcwd()),
-#     type=str,
-#     help="Name of context to initialize",
-# )
+context_list_parser.add_argument(
+    "-d", action="store_true", help="Include descendents",
+)
 
+context_list_parser.add_argument(
+    "--name",
+    type=str,
+    default=infer_context_from_invocation_path(os.getcwd()),
+    help="Name of the context",
+)
 
-# tags_parser.add_argument(
-#     "--context",
-#     default=infer_context_from_invocation_path(os.getcwd()),
-#     help="select an alternative context namespace for the tags",
-# )
+context_list_parser.set_defaults(command=CONTEXT_LIST_COMMAND)
 
-# save_parser.add_argument(
-#     "input", type=str, help="Thing to 'husk'",
-# )
-
-# save_parser.add_argument(
-#     "--tags", type=str, help="Comma separated list of tags",
-# )
-
-# list_parser.add_argument(
-#     "type", type=str, choices=["tags", "bookmarks"], help="The type of thing to list",
-# )
-
-# list_parser.add_argument(
-#     "--pattern", type=str, help="Regex pattern",
-# )
 
 # helpers  -------------------------------------------------------------------------
 
@@ -259,15 +272,10 @@ def find_handler(db, args):
     print("find!")
 
 
-def add_context(db, context_name, context_path):
-    db.execute("INSERT INTO contexts VALUES (?,?)", (context_name, context_path))
-    db.commit()
-
-
 # init handler ---------------------------------------------------------------------
 
 
-def init_handler(db, args):
+def init_handler(args):
     force = args.force
     db_location = os.path.join(args.path, HUSK_DB)
     config_path = os.path.join(str(Path.home()), ".config")
@@ -284,8 +292,61 @@ def init_handler(db, args):
 # context init handler -------------------------------------------------------------
 
 
-def context_init_handler(db, args):
-    print("context init")
+def context_init_handler(args):
+    context_name = args.name
+    context_path = args.path
+    context_type = VIRTUAL_CONTEXT_TYPE if args.virtual else FILE_CONTEXT_TYPE
+    with Husk() as husk:
+        husk.conn.execute(
+            "INSERT INTO contexts (context_name, context_path, context_type) VALUES (?,?,?)",
+            (context_name, None if args.virtual else context_path, context_type),
+        )
+        husk.conn.commit()
+
+
+# context list handler -------------------------------------------------------------
+
+
+def context_list_handler(args):
+    context_name = args.name
+    # global_search = args.G
+
+    with Husk() as husk:
+        headers = [
+            "context_name",
+            "context_type",
+            "created_at",
+            "context_path",
+        ]
+        base_query = "SELECT {} FROM contexts".format(",".join(headers))
+        query = (
+            base_query
+            if context_name == None
+            else "{} WHERE context_name = '{}'".format(base_query, context_name)
+        )
+        results = list(husk.conn.execute(query))
+
+        # calc padding based on either 16 chars default or the longest
+        # string in the column.
+
+        padding = list(
+            map(
+                lambda col: max(
+                    12, 1 + max(map(lambda row_item: len(str(row_item)), col))
+                ),
+                zip(*results),
+            )
+        )
+
+        print(
+            "".join(
+                str(x).ljust(pad)
+                for (x, pad) in zip(["CONTEXT", "TYPE", "CREATED", "PATH",], padding)
+            )
+        )
+        print(sum(padding) * "-")
+        for row in results:
+            print("".join(str(x).ljust(pad) for (x, pad) in zip(row, padding)))
 
 
 # tags handler ---------------------------------------------------------------------
@@ -329,7 +390,8 @@ def list_handler(db, args):
 
 command_handlers = {
     INIT_COMMAND: init_handler,
-    CONTEXT_INIT_COMMAND: context_init_handler
+    CONTEXT_INIT_COMMAND: context_init_handler,
+    CONTEXT_LIST_COMMAND: context_list_handler,
     # SAVE_COMMAND: save_handler,
     # FIND_COMMAND: find_handler,
     # LIST_COMMAND: list_handler,
@@ -337,18 +399,6 @@ command_handlers = {
 }
 
 # helpers --------------------------------------------------------------------------
-
-
-def ensure_db(db_path):
-    # print(db_path)
-    if db_path is None:
-        raise Exception(
-            "No DATABASE selected. Use the shell variable {} or use the --db flag".format(
-                DB_ENV_VAR
-            )
-        )
-    db = sqlite3.connect(db_path)
-    return db
 
 
 def ensure_command(command):
@@ -361,10 +411,8 @@ def ensure_command(command):
 
 
 def main(args):
-    # db = ensure_db(args.db)
-    db = None
     command = ensure_command(vars(args).get("command", None))
-    command_handlers[command](db, args)
+    command_handlers[command](args)
 
 
 if __name__ == "__main__":

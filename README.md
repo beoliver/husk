@@ -190,10 +190,10 @@ husk tag add TAGS [-G] [--name CONTEXT]
 
 Where `TAGS` is a comma separated list of tags
 
-| Flag     | Action                                                                |
-| -------- | --------------------------------------------------------------------- |
-| `-G`     | Create a **G**lobal tag. Equivalent to `husk tag add TAG --name HUSK` |
-| `--name` | Create the tag in a specified context                                 |
+| Flag   | Action                                                                |
+| ------ | --------------------------------------------------------------------- |
+| `-G`   | Create a **G**lobal tag. Equivalent to `husk tag add TAG --name HUSK` |
+| `name` | Create the tag in a specified context                                 |
 
 ## `tag list` <a name="show_tags"></a>
 
