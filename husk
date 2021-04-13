@@ -37,12 +37,18 @@ FILE_CONTEXT_TYPE = "FILE"
 
 
 class Husk(object):
+    config_path = os.path.join(
+        str(Path.home()), ".config", CONFIG_HUSK_DIR, CONFIG_FILE
+    )
+
     def __init__(self):
-        config_path = os.path.join(
-            str(Path.home()), ".config", CONFIG_HUSK_DIR, CONFIG_FILE
-        )
-        with open(config_path) as config:
+        with open(self.config_path, "r") as config:
             self.config = json.loads(config.read())
+
+    def update_config(self, config):
+        with open(self.config_path, "w+") as f:
+            f.write(json.dumps(config))
+            self.config = config
 
     def __enter__(self):
         self.conn = sqlite3.connect(self.config["db_path"])
@@ -64,7 +70,7 @@ def initialize_husk_config(config_dir, db_path, force=False):
     husk_config_path = Path(os.path.join(config_dir, CONFIG_HUSK_DIR))
     husk_config_path.mkdir(exist_ok=force)
     with open(os.path.join(str(husk_config_path), CONFIG_FILE), "w+") as f:
-        f.write(json.dumps({"db_path": db_path}))
+        f.write(json.dumps({"db_path": db_path, "default_context": None}))
 
 
 def initialize_husk_db(db_path, force=False):
@@ -140,15 +146,13 @@ CONTEXT_COMMAND = "ctx"
 CONTEXT_INIT_COMMAND = "{} {}".format(CONTEXT_COMMAND, INIT_COMMAND)
 SHOW_COMMAND = "show"
 CONTEXT_SHOW_COMMAND = "{} {}".format(CONTEXT_COMMAND, SHOW_COMMAND)
-
-# SAVE_COMMAND = "save"
-# FIND_COMMAND = "find"
-# LIST_COMMAND = "list"
-# TAGS_COMMAND = "tags"
+SET_COMMAND = "set"
+CONTEXT_SET_COMMAND = "{} {}".format(CONTEXT_COMMAND, SET_COMMAND)
+UNSET_COMMAND = "unset"
+CONTEXT_UNSET_COMMAND = "{} {}".format(CONTEXT_COMMAND, UNSET_COMMAND)
 
 arg_parser = argparse.ArgumentParser(
-    prog="hu",
-    description="husk is a command line application for taking notes in context.",
+    prog="husk", description="Remember things in context.",
 )
 
 subparsers = arg_parser.add_subparsers()
@@ -217,32 +221,56 @@ context_init_parser.add_argument(
     help="Path to context root directory. By default the path to the current working directory. This flag is ignored when creating a virtual context.",
 )
 
-# CONTEXT LIST parser --------------------------------------------------------------
+# CONTEXT SHOW parser --------------------------------------------------------------
 
-context_list_parser = context_subparsers.add_parser(
-    SHOW_COMMAND, help="List all contexts", description="List all contexts",
+context_show_parser = context_subparsers.add_parser(
+    SHOW_COMMAND, help="Show all contexts", description="Show all contexts",
 )
 
-context_list_parser.add_argument(
+context_show_parser.add_argument(
     "-G", action="store_true", help="All contexts",
 )
 
-context_list_parser.add_argument(
+context_show_parser.add_argument(
     "-a", action="store_true", help="Include anscestors",
 )
 
-context_list_parser.add_argument(
+context_show_parser.add_argument(
     "-d", action="store_true", help="Include descendents",
 )
 
-context_list_parser.add_argument(
+context_show_parser.add_argument(
     "--name",
     type=str,
     default=infer_context_from_invocation_path(os.getcwd()),
     help="Name of the context",
 )
 
-context_list_parser.set_defaults(command=CONTEXT_SHOW_COMMAND)
+context_show_parser.set_defaults(command=CONTEXT_SHOW_COMMAND)
+
+# CONTEXT SET parser --------------------------------------------------------------
+
+context_set_parser = context_subparsers.add_parser(
+    SET_COMMAND,
+    help="Set a VIRTUAL context to work in",
+    description="Set a VIRTUAL context to work in",
+)
+
+context_set_parser.add_argument(
+    "name", type=str, metavar="NAME", help="Name of the VIRTUAL context",
+)
+
+context_set_parser.set_defaults(command=CONTEXT_SET_COMMAND)
+
+# CONTEXT UNSET parser ------------------------------------------------------------
+
+context_unset_parser = context_subparsers.add_parser(
+    UNSET_COMMAND,
+    help="Unset the current VIRTUAL context",
+    description="Unset the current VIRTUAL context",
+)
+
+context_unset_parser.set_defaults(command=CONTEXT_UNSET_COMMAND)
 
 
 # helpers  -------------------------------------------------------------------------
@@ -324,10 +352,39 @@ def context_init_handler(args):
             husk.conn.commit()
 
 
+# context set handler --------------------------------------------------------------
+
+
+def context_set_handler(args):
+    context_name = args.name
+    with Husk() as husk:
+        cursor = husk.conn.execute(
+            "SELECT * FROM contexts WHERE context_name = ? AND context_type = ?",
+            (context_name, VIRTUAL_CONTEXT_TYPE),
+        )
+        if cursor.fetchone():
+            config = husk.config
+            config["default_context"] = context_name
+            husk.update_config(config)
+        else:
+            print("No virtual context '{}' exists.".format(context_name))
+
+
+# context unset handler ------------------------------------------------------------
+
+
+def context_unset_handler(args):
+    with Husk() as husk:
+        config = husk.config
+        if config["default_context"]:
+            config["default_context"] = None
+            husk.update_config(config)
+
+
 # context list handler -------------------------------------------------------------
 
 
-def context_list_handler(args):
+def context_show_handler(args):
     context_name = args.name
     global_search = args.G
 
@@ -409,17 +466,14 @@ def list_handler(db, args):
         print(item)
 
 
-# handlers -------------------------------------------------------------------------
-# dispatch -------------------------------------------------------------------------
+# handler dispatch -----------------------------------------------------------------
 
 command_handlers = {
     INIT_COMMAND: init_handler,
     CONTEXT_INIT_COMMAND: context_init_handler,
-    CONTEXT_SHOW_COMMAND: context_list_handler,
-    # SAVE_COMMAND: save_handler,
-    # FIND_COMMAND: find_handler,
-    # LIST_COMMAND: list_handler,
-    # TAGS_COMMAND: tags_handler,
+    CONTEXT_SHOW_COMMAND: context_show_handler,
+    CONTEXT_SET_COMMAND: context_set_handler,
+    CONTEXT_UNSET_COMMAND: context_unset_handler,
 }
 
 # helpers --------------------------------------------------------------------------
