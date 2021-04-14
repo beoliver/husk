@@ -48,6 +48,19 @@ def read_json_config():
         return json.loads(f.read())
 
 
+def set_default_config_context(name):
+    c = read_json_config()
+    c["default_context"] = name
+    write_json_config(c, force=True)
+
+
+def unset_default_config_context():
+    c = read_json_config()
+    if c.get("default_context"):
+        del c["default_context"]
+    write_json_config(c, force=True)
+
+
 #####################################################################
 # PERSISTENCE
 #####################################################################
@@ -151,7 +164,7 @@ def parent_context_on_path(path):
 
 def infer_context(invocation_path, config=None):
     # a "global_context" **MAY** be set in the config
-    global_context = config.get("global_context") if config else None
+    global_context = config.get("default_context") if config else None
     if global_context:
         return global_context
     return parent_context_on_path(invocation_path)
@@ -392,6 +405,57 @@ class ContextListHandler(Handler):
 
 
 #####################################################################
+## CONTEXT SET HANDLER
+#####################################################################
+
+
+class ContextSetHandler(Handler):
+    about = {
+        "description": "Set a global VIRTUAL context to work in",
+        "help": "Set a global VIRTUAL context to work in",
+    }
+    interface = [
+        {
+            "args": ["name"],
+            "kwargs": {
+                "type": str,
+                "metavar": "NAME",
+                "help": "Name of the VIRTUAL context",
+            },
+        },
+    ]
+
+    def execute(self, name=None):
+        if name:
+            config = read_json_config()
+            with DB_Context(config) as db:
+                cursor = db.connection.execute(
+                    "SELECT * FROM contexts WHERE context_name = ? AND context_path IS NULL",
+                    (name,),
+                )
+                if cursor.fetchone():
+                    set_default_config_context(name)
+                else:
+                    print("No virtual context '{}' exists.".format(name))
+
+
+#####################################################################
+## CONTEXT UNSET HANDLER
+#####################################################################
+
+
+class ContextUnsetHandler(Handler):
+    about = {
+        "description": "Un-set any current global VIRTUAL context",
+        "help": "Un-set any current global VIRTUAL context",
+    }
+    interface = []
+
+    def execute(self):
+        unset_default_config_context()
+
+
+#####################################################################
 # TAG HANDLERS
 #####################################################################
 
@@ -464,6 +528,8 @@ ROUTES = {
             "init": {"handler": ContextInitHandler},
             "info": {"handler": ContextInfoHandler},
             "list": {"handler": ContextListHandler},
+            "set": {"handler": ContextSetHandler},
+            "unset": {"handler": ContextUnsetHandler},
         },
     },
     "tag": {"handler": TagHandler},
