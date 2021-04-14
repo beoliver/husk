@@ -45,7 +45,7 @@ def write_json_config(config: Any, force=False):
 
 def read_json_config():
     with open(husk_config_path(), "r+") as f:
-        json.loads(f.read())
+        return json.loads(f.read())
 
 
 #####################################################################
@@ -116,7 +116,8 @@ class DB_Context(object):
 HUSK_CONTEXT_FILENAME = ".husk_context"
 
 
-def read_context(path):
+def read_context(dir):
+    path = Path(dir) / HUSK_CONTEXT_FILENAME
     with open(path, "r") as f:
         return json.loads(f.read())
 
@@ -139,7 +140,7 @@ def parent_context_on_path(path):
                 None,
             )
         if file:
-            context = read_context(file.path)
+            context = read_context(path)
             return context.get("context_name")
         else:
             if path == next_path:
@@ -156,11 +157,13 @@ def infer_context(invocation_path, config=None):
     return parent_context_on_path(invocation_path)
 
 
-def create_context(db_context, name, path=None):
+def create_context(db_context, name, dir=None):
     with db_context as db:
-        db.connection.execute(insert_context_statement(name, path))
-        with open(path, "w+") as f:
-            json.loads(f.read())
+        db.connection.execute(*insert_context_statement(name, dir))
+        if dir:
+            path = Path(dir) / HUSK_CONTEXT_FILENAME
+            with open(path, "w+") as f:
+                f.write(json.dumps({"context_name": name, "context_path": str(dir)}))
         db.connection.commit()
 
 
