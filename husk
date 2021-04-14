@@ -308,6 +308,33 @@ class ContextInitHandler(Handler):
 
 
 #####################################################################
+## CONTEXT INFO HANDLER
+#####################################################################
+
+
+class ContextInfoHandler(Handler):
+    about = {
+        "description": "Show information about the current context",
+        "help": "Show information about the current context",
+    }
+    interface = [
+        {
+            "args": ["-v", "--verbose"],
+            "kwargs": {"action": "store_true", "help": "Verbose output",},
+        },
+    ]
+
+    def execute(self, verbose=False):
+        config = read_json_config()
+        context = infer_context(os.getcwd(), config)
+        if context:
+            if verbose:
+                print("verbose: {}".format(context))
+            else:
+                print(context)
+
+
+#####################################################################
 ## CONTEXT LIST HANDLER
 #####################################################################
 
@@ -422,6 +449,7 @@ ROUTES = {
         "handler": ContextHandler,
         "routes": {
             "init": {"handler": ContextInitHandler},
+            "info": {"handler": ContextInfoHandler},
             "list": {"handler": ContextListHandler},
         },
     },
