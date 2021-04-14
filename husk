@@ -90,7 +90,7 @@ def insert_context_statement(context_name, context_path=None):
 def write_empty_database(db_path, default_context="HUSK"):
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
-    for (table_name, table_fields) in HUSK_DATABASE_TABLES:
+    for (table_name, table_fields) in HUSK_DATABASE_TABLES.items():
         cursor.execute(create_table_statement(table_name, table_fields))
     connection.execute(*insert_context_statement(default_context))
     connection.commit()
@@ -232,7 +232,7 @@ class InitHandler(Handler):
         db_path = husk_dir / "husk.db"
         if db_path.exists() and not force:
             raise Exception("Database already exists")
-        config = {"root": husk_dir, "db": db_path}
+        config = {"root": str(husk_dir), "db": str(db_path)}
         write_empty_database(db_path)
         write_json_config(config, force)
 
@@ -305,6 +305,24 @@ class ContextInitHandler(Handler):
 
 
 #####################################################################
+## CONTEXT LIST HANDLER
+#####################################################################
+
+
+class ContextListHandler(Handler):
+    about = {"description": "Show all contexts", "help": "Show all contexts"}
+    interface = [
+        {"args": ["-G"], "kwargs": {"action": "store_true", "help": "All contexts",},},
+        {"args": ["--name"], "kwargs": {"type": str, "help": "Name of the context",},},
+    ]
+
+    def execute(self, G=False, name=None):
+        config = read_json_config()
+        name = name if name else infer_context(os.getcwd(), config)
+        print(name)
+
+
+#####################################################################
 # ARG PARSER
 #####################################################################
 
@@ -360,7 +378,10 @@ ROUTES = {
     "init": {"handler": InitHandler},
     "context": {
         "handler": ContextHandler,
-        "routes": {"init": {"handler": ContextInitHandler}},
+        "routes": {
+            "init": {"handler": ContextInitHandler},
+            "list": {"handler": ContextListHandler},
+        },
     },
 }
 
@@ -369,11 +390,8 @@ ROUTES = {
 #####################################################################
 
 if __name__ == "__main__":
-    try:
-        parser = build_arg_parser(ROUTES)
-        args = parser.parse_args()
-        args.func(args)
-    except Exception as e:
-        print(e)
-        sys.exit(1)
+
+    parser = build_arg_parser(ROUTES)
+    args = parser.parse_args()
+    args.func(args)
 
