@@ -392,6 +392,19 @@ class ContextListHandler(Handler):
 
 
 #####################################################################
+# TAG HANDLERS
+#####################################################################
+
+
+class TagHandler(Handler):
+    about = {"description": "Tag stuff", "help": "Tag stuff"}
+    interface = []
+
+    def execute(self, **kwargs):
+        None
+
+
+#####################################################################
 # ARG PARSER
 #####################################################################
 
@@ -453,6 +466,7 @@ ROUTES = {
             "list": {"handler": ContextListHandler},
         },
     },
+    "tag": {"handler": TagHandler},
 }
 
 #####################################################################
