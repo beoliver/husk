@@ -98,8 +98,8 @@ def write_empty_database(db_path, default_context="HUSK"):
 
 
 class DB_Context(object):
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, config):
+        self.path = config.get("db")
 
     def __enter__(self):
         self.connection = sqlite3.connect(self.path)
@@ -304,7 +304,7 @@ class ContextInitHandler(Handler):
             )
         if user_confirmation("\n".join(actions)):
             config = read_json_config()
-            create_context(DB_Context(config.get("db")), name, path)
+            create_context(DB_Context(config), name, path)
 
 
 #####################################################################
@@ -320,9 +320,48 @@ class ContextListHandler(Handler):
     ]
 
     def execute(self, G=False, name=None):
+        global_search = G
         config = read_json_config()
-        name = name if name else infer_context(os.getcwd(), config)
-        print(name)
+        context = name if name else infer_context(os.getcwd(), config)
+        if context is None and not global_search:
+            return
+
+        with DB_Context(config) as husk:
+            headers = [
+                "context_name",
+                "created_at",
+                "context_path",
+            ]
+            base_query = "SELECT {} FROM contexts".format(",".join(headers))
+            query = (
+                base_query
+                if global_search
+                else "{} WHERE context_name = '{}'".format(base_query, context)
+            )
+
+            results = list(husk.connection.execute(query))
+
+            # calc padding based on either 16 chars default or the longest
+            # string in the column.
+
+            padding = list(
+                map(
+                    lambda col: max(
+                        12, 1 + max(map(lambda row_item: len(str(row_item)), col))
+                    ),
+                    zip(*results),
+                )
+            )
+
+            print(
+                "".join(
+                    str(x).ljust(pad)
+                    for (x, pad) in zip(["CONTEXT", "CREATED", "PATH",], padding)
+                )
+            )
+            print(sum(padding) * "-")
+            for row in results:
+                print("".join(str(x).ljust(pad) for (x, pad) in zip(row, padding)))
 
 
 #####################################################################
