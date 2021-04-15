@@ -27,8 +27,12 @@ def user_confirmation(message, implicit_yes=False):
 #####################################################################
 
 
-def husk_config_path() -> Path:
-    return Path.home() / ".config" / "husk" / "config.json"
+def husk_config_dir() -> Path:
+    return Path.home() / ".config" / "husk"
+
+
+def husk_config_file() -> Path:
+    return husk_config_dir() / "config.json"
 
 
 def write_json_config(config: Any, force=False):
@@ -44,7 +48,7 @@ def write_json_config(config: Any, force=False):
 
 
 def read_json_config():
-    with open(husk_config_path(), "r+") as f:
+    with open(husk_config_file(), "r+") as f:
         return json.loads(f.read())
 
 
@@ -98,6 +102,42 @@ def insert_context_statement(context_name, context_path=None):
         "INSERT INTO contexts (context_name, context_path) VALUES (?, ?)",
         (context_name, context_path),
     )
+
+
+def insert_tag_statement(tag):
+    return ("INSERT INTO tags (tag_name) VALUES (?)", (tag,))
+
+
+def insert_context_tag_statement(context_id, tag_id):
+    return (
+        "INSERT INTO context_tags (context_id, tag_id) VALUES (?,?)",
+        (context_id, tag_id),
+    )
+
+
+def insert_tags(db_context, context, tags):
+    with db_context as db:
+        cursor = db.connection.cursor()
+        # make sure that the context exists
+        cursor.execute(
+            "SELECT context_id FROM contexts WHERE context_name = ?", (context,)
+        )
+        result = cursor.fetchone()
+        # if no context then just return
+        if not result:
+            return
+        (context_id,) = result
+        # insert the tags into the tags table
+        for tag in tags:
+            # make sure that there are no user errors with duplicate tags.
+            # collect the ids that were inserted
+            try:
+                cursor.execute(*insert_tag_statement(tag))
+                tag_id = cursor.lastrowid
+                cursor.execute(*insert_context_tag_statement(context_id, tag_id))
+            except sqlite3.IntegrityError:
+                pass
+        db.connection.commit()
 
 
 def write_empty_database(db_path, default_context="HUSK"):
@@ -189,6 +229,24 @@ def valid_context_name(name):
 def ensure_valid_context_name(name):
     if not valid_context_name(name):
         raise Exception("'{}' is not a valid context name".format(name))
+    return name
+
+
+#####################################################################
+# HANDLERS
+#####################################################################
+
+
+def valid_tag_name(name):
+    if name == "":
+        return False
+    return True
+
+
+def ensure_valid_tag_name(name):
+    if not valid_tag_name(name):
+        raise Exception("'{}' is not a valid tag name".format(name))
+    return name
 
 
 #####################################################################
@@ -469,6 +527,103 @@ class TagHandler(Handler):
 
 
 #####################################################################
+# TAG ADD HANDLERS
+#####################################################################
+
+
+class TagAddHandler(Handler):
+    about = {"description": "Add a Tag", "help": "Add a Tag"}
+    interface = [
+        {
+            "args": ["tags"],
+            "kwargs": {
+                "type": str,
+                "metavar": "TAGS",
+                "help": "Comma separated list of tags",
+            },
+        },
+        {
+            "args": ["-G"],
+            "kwargs": {
+                "action": "store_true",
+                "help": "Create a global tag 'add --context HUSK'",
+            },
+        },
+        {
+            "args": ["--context"],
+            "kwargs": {
+                "type": str,
+                "metavar": "NAME",
+                "help": "Explicit context to create the tag in",
+            },
+        },
+    ]
+
+    def execute(self, tags="", G=False, context=None):
+        config = read_json_config()
+        context = context if context else infer_context(os.getcwd(), config)
+        tags = [ensure_valid_tag_name(tag.strip()) for tag in tags.split(",")]
+        insert_tags(DB_Context(config), context, tags)
+
+
+#####################################################################
+# TAG LIST HANDLER
+#####################################################################
+
+
+class TagListHandler(Handler):
+    about = {"description": "List Tags", "help": "List Tags"}
+    interface = [
+        {"args": ["-G"], "kwargs": {"action": "store_true", "help": "All contexts",},},
+        {
+            "args": ["--context"],
+            "kwargs": {"type": str, "help": "Name of the context",},
+        },
+    ]
+
+    def execute(self, G=False, context=None):
+        global_search = G
+        config = read_json_config()
+        context = context if context else infer_context(os.getcwd(), config)
+        if context is None and not global_search:
+            return
+
+        with DB_Context(config) as husk:
+            headers = ["tag_name", "context_name", "context_tags.created_at"]
+            base_query = "SELECT {} FROM context_tags INNER JOIN tags ON context_tags.tag_id = tags.tag_id INNER JOIN contexts".format(
+                ",".join(headers)
+            )
+            query = (
+                base_query
+                if global_search
+                else "{} WHERE context_name = '{}'".format(base_query, context)
+            )
+
+            results = list(husk.connection.execute(query))
+            # calc padding based on either 16 chars default or the longest
+            # string in the column.
+
+            padding = list(
+                map(
+                    lambda col: max(
+                        12, 1 + max(map(lambda row_item: len(str(row_item)), col))
+                    ),
+                    zip(*results),
+                )
+            )
+
+            print(
+                "".join(
+                    str(x).ljust(pad)
+                    for (x, pad) in zip(["TAG", "CONTEXT", "CREATED",], padding)
+                )
+            )
+            print(sum(padding) * "-")
+            for row in results:
+                print("".join(str(x).ljust(pad) for (x, pad) in zip(row, padding)))
+
+
+#####################################################################
 # ARG PARSER
 #####################################################################
 
@@ -532,7 +687,13 @@ ROUTES = {
             "unset": {"handler": ContextUnsetHandler},
         },
     },
-    "tag": {"handler": TagHandler},
+    "tag": {
+        "handler": TagHandler,
+        "routes": {
+            "add": {"handler": TagAddHandler},
+            "list": {"handler": TagListHandler},
+        },
+    },
 }
 
 #####################################################################

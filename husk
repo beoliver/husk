@@ -7,5 +7,8 @@ import husk_cli
 
 if __name__ == "__main__":
 
-    husk_cli.run()
+    try:
+        husk_cli.run()
+    except Exception as e:
+        print(e)
 
